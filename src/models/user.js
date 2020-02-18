@@ -2,7 +2,10 @@ const mongoose = require('mongoose')
 const validator = require('validator')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
+const Task = require('./task')
 
+
+//create a user schema
 const userSchema = mongoose.Schema({
     name: {
         type: String,
@@ -49,9 +52,33 @@ const userSchema = mongoose.Schema({
             type: String,
             required: true
         }
-    }]
+    }],
+    avatar: {
+        type: Buffer,
+    }
 
+}, {
+    timestamps: true,
 })
+
+userSchema.virtual('tasks', {
+    ref: 'Tasks',
+    localField: '_id',
+    foreignField: 'owner'
+})
+
+/*
+userSchema.methods.getPublicProfile = function () {
+    const user = this
+    const userObject = user.toObject()
+
+    delete userObject.tokens
+    delete userObject.password
+
+    return userObject
+}
+
+*/
 
 userSchema.methods.generateAuthToken = async function()  {
     const user = this
@@ -61,12 +88,13 @@ userSchema.methods.generateAuthToken = async function()  {
     return token
 }
 
-userSchema.methods.toJSON =  function() {
+userSchema.methods.toJSON = function() {
     const user = this
     const userObject = user.toObject()
 
     delete userObject.password
     delete userObject.tokens 
+    delete userObject.avatar
 
     return userObject
 }
@@ -89,6 +117,9 @@ userSchema.statics.findByCredentials = async (email, password) => {
 userSchema.pre('save', async function (next) {
     const user = this
 
+
+    //to check that is password s modified, then only this process will run, not when, say, names are changed, else it will hash the hashed password which isn't what we want.
+
     if(user.isModified('password')) {
         user.password = await bcrypt.hash(user.password, 8)
     }
@@ -97,6 +128,13 @@ userSchema.pre('save', async function (next) {
     next()
     //To tell that work of this function has been completed and next thread can be called.
 
+})
+
+//Delete user tasks when user is removed
+userSchema.pre('remove', async function (next) {
+    const user = this
+    await Task.deleteMany({owner: user._id})
+    next()
 })
 
 const User = mongoose.model('User', userSchema)

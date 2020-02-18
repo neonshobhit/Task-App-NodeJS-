@@ -2,6 +2,24 @@ const express = require('express')
 const router = new express.Router()
 const auth = require('../middleware/auth')
 const User = require('../models/user')
+const multer = require('multer')
+const sharp = require('sharp')
+
+const upload = multer({
+    //dest: 'avatar',
+    limits: {
+        fileSize: 1000000,
+
+    },
+    fileFilter(req, file, cb) {
+        if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
+            return cb(new Error('Please upload a valid image'))
+        }
+
+        cb(undefined, true)
+    }
+})
+
 
 router.get('/test', (req,res) => {
     res.send("From a new file")
@@ -44,7 +62,7 @@ router.post('/users/login', async (req, res) => {
 
 })
 
-router.post('/users/logout', auth, async(req, res) => {
+router.post('/users/logout', auth, async (req, res) => {
     try {
         req.user.tokens = req.user.tokens.filter((token) => {
             return token.token !== req.token
@@ -169,7 +187,7 @@ router.patch('/users/me', auth, async (req, res) => {
 */
 router.delete('/users/me', auth, async (req,res) => {
     try {
-        const user = await User.findByIdAndDelete(req.user._id) //req.params.id
+        //const user = await User.findByIdAndDelete(req.user._id) //req.params.id
         /*
         no more need 
         if (!user) {
@@ -183,6 +201,58 @@ router.delete('/users/me', auth, async (req,res) => {
     } catch (e) {
         res.status(500).send()
 
+    }
+})
+
+
+router.post('/users/me/avatar', auth, upload.single('avatar'), async (req, res) => {
+    const buffer = await sharp(req.file.buffer).resize(200,300, {
+        fit: sharp.fit.inside
+    }).png().toBuffer()
+    // resize() not working. Why? Check later
+
+    
+    req.user.avatar = req.file.buffer
+
+
+    //  <img src="data:image.jpg;base64,/.....
+    // the image can be rendered from binary data to image in html like these
+    await req.user.save()
+    res.send()
+}, (error, req, res, next) =>{
+    res.status(400).send({error: error.message})
+
+})
+
+router.delete('/users/me/avatar', auth, upload.single('avatar'), async (req, res) => {
+    try {
+        req.user.avatar = undefined
+        await req.user.save()
+        res.send()
+
+    } catch (e) {
+
+    }
+})
+
+router.get('/users/:id/avatar', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id)
+        if (!user || !user.avatar) {
+            throw new Error
+        }
+
+        //res.set('Content-Type', 'application/json')
+
+        // res.send('Content-Type', 'image/jpg')
+        // res.send(user.avatar)
+        // not working. not no why! maybe version problem. Anyways, the solution is write below.
+
+        res.writeHead(200, {'Content-Type': 'image/png'})
+        res.end(user.avatar)
+
+    } catch (e) {
+        res.status(404).send()
     }
 })
 
