@@ -180,7 +180,7 @@ router.patch('/users/me', auth, async (req, res) => {
 */
         res.send(user)
     } catch (e) {
-        res.status(404).send(e)
+        res.status(400).send(e)
         //res.send(e)
     }
 })

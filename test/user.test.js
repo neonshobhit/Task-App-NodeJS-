@@ -1,24 +1,13 @@
 const request = require('supertest')
-const jwt = require('jsonwebtoken')
-const mongoose = require('mongoose')
 const app = require('../src/app')
 const User = require('../src/models/user')
+const {userOneId, userOne, setupDatabase} = require('./fixtures/db')
+const validator = require('validator')
+const jwt = require('jsonwebtoken')
 
-const userOneId = new mongoose.Types.ObjectId()
-const userOne = {
-    _id: userOneId,
-    name: 'Mike',
-    email: 'xaba@getnada.com',
-    password: 'mike@example.com',
-    tokens: [{
-        token: jwt.sign({ _id: userOneId }, process.env.JWT_SECRET)
-    }]
-}
 
-beforeEach(async () => {
-    await User.deleteMany()
-    await new User(userOne).save()
-})
+
+beforeEach(setupDatabase)
 
 // afterEach(() => {
 //     console.log("After each")
@@ -47,7 +36,6 @@ test('Should sign up a new user', async () => {
         },
         token: user.tokens[0].token
     })
-
     expect(user.password).not.toBe('shobhitmaheshwari')
 })
 
@@ -140,3 +128,108 @@ test('Should not update invalid user fields', async () => {
         .expect(400)
 
 })
+
+test('Should not SignUp with invalid name', async () => {
+    const response = await request(app)
+        .post('/users')
+        .send({
+            name: '123',
+            email: 'hello@world.com',
+            password: 'helloworld'
+
+        })
+        .expect(201)
+        const user = await User.findById(response.body.user._id)
+        expect(user).not.toBeNull()
+        expect(user.name).toEqual(expect.any(String))
+})
+
+test('Should not SignUp with invalid password', async () => {
+    const response = await request(app)
+        .post('/users')
+        .send({
+            name: '123',
+            email: 'hello@world.com',
+            password: 'hel'
+
+        })
+        .expect(400)
+        /*
+        const user = await User.findById(response.body.user._id)
+        expect(user).not.toBeNull()
+        expect(user.password).not.toEqual('helloworld')
+        */
+})
+
+test('Should not SignUp with invalid email', async () => {
+    const response = await request(app)
+        .post('/users')
+        .send({
+            name: '123',
+            email: 'hello@wocom',
+            password: 'helloworld'
+
+        })
+        .expect(400)
+        /*
+        const user = await User.findById(response.body.user._id)
+        expect(user).not.toBeNull()
+        const isValid = validator.isEmail(user.email)
+        expect(isValid).not.toEqual(false)
+        */
+})
+
+test('Should not update user if unauthenticated', async () => {
+    const response = await request(app)
+        .patch('/users/me')
+        .send({
+            name:  "Shobhit"
+        })
+        .expect(401)
+})
+
+test('Should not delete user if unauthenticated', async () => {
+    const response = await request(app)
+        .delete('/users/me')
+        .send({
+            name:  "Shobhit"
+        })
+        .expect(401)
+})
+
+test('Should not update with invalid name', async () => {
+    const response = await request(app)
+        .patch('/users/me')
+        .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+        .send({
+            name: '123',
+
+        })
+        .expect(200)
+        const user = await User.findById(userOneId)
+        expect(user).not.toBeNull()
+        expect(user.name).toEqual(expect.any(String))
+})
+
+test('Should not update with invalid password', async () => {
+    const response = await request(app)
+        .patch('/users/me')
+        .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+        .send({
+            password: 'hello',
+        })
+        .expect(400)
+
+        
+})
+
+test('should not update wth invalid email', async () => {
+    await request(app)
+        .patch('/users/me')
+        .set('Authorization', `Bearer ${userOne.tokens[0].token}`)
+        .send({
+            email: 'sabc@c',
+        })
+        .expect(400)
+})
+
