@@ -1,12 +1,14 @@
-module.exports = {
-    messages() {
+module.exports = function(apiKey, domain) {
+    const object2 = {
+        send() {
 
-    },
-    send() {
-
-    },
-    mailgun({}) {
-        
+        }
     }
 
+    const object1 = {
+        messages () {
+            return object2
+        }
+    }
+    return object1
 }
